@@ -1,0 +1,245 @@
+import React from 'react';
+import { 
+  Search, ShoppingCart, Trash2, Minus, Plus, 
+  Banknote, Edit2, PauseCircle, X 
+} from 'lucide-react';
+import { formatRupiah, getCatEmoji } from '../utils';
+
+export default function POSScreen({ props, theme }) {
+  // Destrukturisasi semua state dan fungsi dari App.jsx
+  const { 
+    searchQuery, setSearchQuery, 
+    activeCategory, setActiveCategory, displayCategories, 
+    filteredProductsSafe, addToCart, cart, updateQty, clearCart, 
+    isCartOpen, setIsCartOpen, discount, setDiscount, 
+    taxEnabled, setTaxEnabled, subtotal, taxAmount, grandTotal,
+    setCheckoutModalOpen, editingTransactionId, handleHoldBill, cancelEditMode
+  } = props;
+
+  return (
+    <div className="flex-1 flex h-full min-h-0 relative">
+      
+      {/* BANNER MENGEDIT TRANSAKSI (Muncul saat mode Retur/Edit Invoice) */}
+      {editingTransactionId && (
+        <div className="absolute top-0 left-0 right-0 bg-red-600 text-white text-center py-2 font-bold z-20 flex justify-center items-center gap-4 shadow-lg animate-pulse">
+          <span>⚠️ MENGEDIT TRANSAKSI: {editingTransactionId} ⚠️</span>
+          <button onClick={cancelEditMode} className="bg-black/30 hover:bg-black/50 px-3 py-1 rounded text-xs transition-colors">
+            Batalkan Edit
+          </button>
+        </div>
+      )}
+
+      {/* ======================================================= */}
+      {/* AREA KIRI: KATALOG PRODUK & PENCARIAN */}
+      {/* ======================================================= */}
+      <div className={`flex-1 flex flex-col min-w-0 ${editingTransactionId ? 'pt-10' : ''}`}>
+        
+        {/* Header Kiri: Search Bar & Kategori */}
+        <div className={`p-4 md:p-6 pb-2 space-y-4 shrink-0 ${theme.bgPanel} backdrop-blur-sm`}>
+          <div className="relative">
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${theme.textMuted}`} size={20} />
+            <input 
+              type="text" 
+              placeholder="Cari kode sku / nama barang..." 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              className={`w-full bg-black/20 border ${theme.border} ${theme.textMain} rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:ring-1 focus:ring-current transition-all backdrop-blur-md`}
+            />
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {displayCategories.map(cat => (
+              <button 
+                key={cat} 
+                onClick={() => setActiveCategory(cat)} 
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all border backdrop-blur-md ${
+                  activeCategory === cat 
+                    ? `${theme.buttonBg} ${theme.buttonText} shadow-lg` 
+                    : `bg-black/10 ${theme.border} ${theme.textMuted} hover:bg-black/20`
+                }`}
+              >
+                <span className="text-lg">{getCatEmoji(cat)}</span> {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Grid Katalog Produk (Responsif: HP 2 kolom, Tablet 3 kolom, Desktop 4 kolom) */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 pt-0 bg-transparent">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 pb-20 md:pb-4 mt-2">
+            {filteredProductsSafe.map(product => {
+              const isOutOfStock = (product.stock || 0) <= 0; 
+              return (
+                <div 
+                  key={product.id} 
+                  onClick={() => !isOutOfStock && addToCart(product)} 
+                  className={`${theme.bgPanel} backdrop-blur-md border ${theme.border} rounded-2xl overflow-hidden flex flex-col h-full transition-all duration-300 relative p-3 md:p-4 shadow-lg ${
+                    isOutOfStock 
+                      ? 'opacity-60 cursor-not-allowed grayscale' 
+                      : `cursor-pointer hover:border-current hover:bg-black/20 group`
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${theme.accent}`}>
+                      {product.category || 'Lain-lain'}
+                    </span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${
+                      isOutOfStock ? 'bg-red-900/80 text-red-200' : 'bg-black/30 text-current'
+                    }`}>
+                      Stok: {product.stock || 0}
+                    </span>
+                  </div>
+                  
+                  <h3 className={`font-semibold text-sm md:text-base leading-tight my-2 md:my-3 flex-1 ${theme.textMain} ${!isOutOfStock && 'group-hover:opacity-80'}`}>
+                    {product.name}
+                  </h3>
+                  
+                  <div className={`flex items-end justify-between mt-auto border-t ${theme.border} pt-2 md:pt-3`}>
+                    <span className={`font-bold text-base md:text-lg ${theme.accent}`}>
+                      {formatRupiah(product.price)}
+                    </span>
+                    {!isOutOfStock && (
+                      <button className={`w-7 h-7 md:w-8 md:h-8 rounded-full bg-black/20 flex items-center justify-center transition-colors group-hover:${theme.buttonBg} group-hover:${theme.buttonText}`}>
+                        <Plus size={16} />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Overlay Barang Habis */}
+                  {isOutOfStock && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/70 font-bold text-red-500 uppercase tracking-widest text-lg border-2 border-red-500 rounded-2xl backdrop-blur-sm">
+                      Habis
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+      
+      {/* ======================================================= */}
+      {/* AREA KANAN: PANEL KERANJANG (CART) */}
+      {/* ======================================================= */}
+      <div className={`fixed lg:static inset-y-0 right-0 z-50 w-full max-w-[380px] ${theme.bgPanel} backdrop-blur-xl border-l ${theme.border} flex flex-col shadow-2xl transition-transform duration-300 ${isCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'} shrink-0 ${editingTransactionId ? 'pt-10' : ''}`}>
+        
+        {/* Header Keranjang */}
+        <div className={`p-4 border-b ${theme.border} flex justify-between items-center bg-black/20 shrink-0`}>
+          <div className="flex items-center gap-2">
+            <ShoppingCart className={theme.accent} size={20} />
+            <h2 className={`font-bold ${theme.textMain} tracking-wide`}>Struk Pembelian</h2>
+          </div>
+          <div className="flex gap-1">
+            {!editingTransactionId && (
+              <button onClick={handleHoldBill} disabled={cart.length===0} className={`p-2 ${theme.textMuted} hover:${theme.accent} disabled:opacity-30`} title="Simpan Meja">
+                <PauseCircle size={18} />
+              </button>
+            )}
+            <button onClick={clearCart} disabled={cart.length===0} className={`p-2 ${theme.textMuted} hover:text-red-500 disabled:opacity-30`} title="Kosongkan Keranjang">
+              <Trash2 size={18} />
+            </button>
+            <button onClick={() => setIsCartOpen(false)} className={`lg:hidden p-2 ${theme.textMuted} hover:text-white`}>
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* List Item di Keranjang */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {cart.length === 0 ? (
+            <div className={`h-full flex flex-col items-center justify-center opacity-40 ${theme.textMuted}`}>
+              <ShoppingCart size={40} />
+              <p className="mt-2 text-sm">Belum ada item</p>
+            </div>
+          ) : (
+            cart.map(item => (
+              <div key={item.id} className={`flex gap-3 bg-black/10 p-3 rounded-xl border ${theme.border} items-center`}>
+                <div className="flex-1 min-w-0">
+                  <h4 className={`font-semibold ${theme.textMain} text-sm truncate`}>{item.name}</h4>
+                  <div className={`${theme.accent} text-xs mt-1`}>{formatRupiah(item.price)}</div>
+                </div>
+                <div className={`flex items-center bg-black/20 rounded-lg border ${theme.border} shrink-0 h-8`}>
+                  <button onClick={() => updateQty(item.id, -1)} className={`w-8 h-full flex items-center justify-center ${theme.textMain} hover:text-red-400`}>
+                    <Minus size={14} />
+                  </button>
+                  <span className={`w-6 text-center text-sm font-bold ${theme.textMain}`}>
+                    {item.qty || 0}
+                  </span>
+                  <button onClick={() => updateQty(item.id, 1)} className={`w-8 h-full flex items-center justify-center ${theme.textMain} hover:text-emerald-400`}>
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Kalkulasi & Checkout */}
+        <div className={`bg-black/30 border-t ${theme.border} p-4 shrink-0 space-y-3`}>
+          
+          {/* Input Diskon & Toggle PPN */}
+          <div className="flex gap-2">
+            <input 
+              type="number" 
+              placeholder="Potongan (Rp)" 
+              value={discount || ''} 
+              onChange={e => setDiscount(Number(e.target.value))} 
+              className={`flex-1 bg-black/20 border ${theme.border} rounded-lg p-2 ${theme.textMain} text-xs focus:outline-none`}
+            />
+            <button 
+              onClick={() => setTaxEnabled(!taxEnabled)} 
+              className={`px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${
+                taxEnabled 
+                  ? `${theme.buttonBg} ${theme.buttonText} border-transparent` 
+                  : `bg-black/20 ${theme.textMuted} ${theme.border}`
+              }`}
+            >
+              + PPN 10%
+            </button>
+          </div>
+          
+          {/* Rincian Harga */}
+          <div className="space-y-1">
+            <div className={`flex justify-between text-xs ${theme.textMuted}`}>
+              <span>Subtotal Dasar</span>
+              <span>{formatRupiah(subtotal)}</span>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-xs text-emerald-400">
+                <span>Diskon Manual</span>
+                <span>-{formatRupiah(discount)}</span>
+              </div>
+            )}
+            {taxEnabled && (
+              <div className="flex justify-between text-xs text-red-400">
+                <span>Pajak Transaksi 10%</span>
+                <span>+{formatRupiah(taxAmount)}</span>
+              </div>
+            )}
+            <div className={`pt-2 border-t ${theme.border} flex justify-between items-center`}>
+              <span className="text-sm font-bold">Total Pembayaran</span>
+              <span className={`text-xl font-black ${theme.accent}`}>{formatRupiah(grandTotal)}</span>
+            </div>
+          </div>
+          
+          {/* Tombol Eksekusi */}
+          <button 
+            onClick={() => setCheckoutModalOpen(true)} 
+            disabled={cart.length === 0} 
+            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all shadow-lg border disabled:opacity-50 disabled:cursor-not-allowed ${
+              editingTransactionId 
+                ? 'bg-amber-700 hover:bg-amber-600 border-amber-500 text-white' 
+                : `${theme.buttonBg} ${theme.buttonText}`
+            }`}
+          >
+            {editingTransactionId ? (
+              <><Edit2 size={20} /> Update Transaksi</>
+            ) : (
+              <><Banknote size={20} /> Checkout Transaksi</>
+            )}
+          </button>
+
+        </div>
+      </div>
+    </div>
+  );
+}
