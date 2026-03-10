@@ -1,0 +1,14 @@
+{
+  "appId": "com.ggpasoryan.pos",
+  "productName": "GG Pasoryan Enterprise POS",
+  "directories": {
+    "output": "release"
+  },
+  "win": {
+    "target": "portable",
+    "icon": "public/icon.ico"
+  },
+  "portable": {
+    "artifactName": "GG-Pasoryan-POS-Windows.exe"
+  }
+}
