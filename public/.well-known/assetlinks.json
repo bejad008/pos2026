@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.ggpasoryan.pos",
+    "sha256_cert_fingerprints": [
+      "9E:A4:EF:D5:68:5E:03:15:3C:45:7A:49:3F:A5:E5:8B:61:63:3E:3F:3B:53:A0:4E:33:07:32:2F:C8:6B:C8:96"
+    ]
+  }
+}]
