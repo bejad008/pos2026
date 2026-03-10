@@ -1,10 +1,10 @@
 name: Build Windows EXE
 
 on:
-  workflow_dispatch:   # jalankan manual dari GitHub
+  workflow_dispatch:
   push:
     tags:
-      - 'v*'          # atau otomatis saat push tag versi
+      - 'v*'
 
 jobs:
   build-windows:
@@ -14,87 +14,79 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Post Checkout repo
+        run: echo "Repo checked out"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
+      - name: Post Setup Node.js
+        run: echo "Node.js setup complete"
+
       - name: Install dependencies
         run: npm install
 
-      - name: Build Vite (dist/)
+      - name: Build Vite
         run: npm run build
 
-      - name: Install Electron Builder
+      - name: Install Electron & builder
         run: npm install --save-dev electron electron-builder
 
-      - name: Create Electron main.js
-        shell: bash
+      - name: Generate Electron files
+        shell: pwsh
         run: |
-          cat > electron-main.js << 'EOF'
-          const { app, BrowserWindow, session } = require('electron');
-          const path = require('path');
-          const fs = require('fs');
-
-          let mainWindow;
+          $electronMain = @'
+          const { app, BrowserWindow } = require('electron')
+          const path = require('path')
 
           function createWindow() {
-            mainWindow = new BrowserWindow({
+            const win = new BrowserWindow({
               width: 1280,
               height: 800,
-              minWidth: 375,
-              minHeight: 600,
-              title: 'GG Pasoryan Enterprise POS',
-              icon: path.join(__dirname, 'dist', 'icon-512.png'),
-              autoHideMenuBar: true,
               webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
-                webSecurity: true,
-                // Izinkan localStorage persist
-                partition: 'persist:ggpos',
-              },
-            });
-
-            // Load dari dist/ lokal
-            const indexPath = path.join(__dirname, 'dist', 'index.html');
-            mainWindow.loadFile(indexPath);
-
-            // Hapus menu bar
-            mainWindow.setMenu(null);
-
-            mainWindow.on('closed', () => {
-              mainWindow = null;
-            });
+                partition: 'persist:ggpos'
+              }
+            })
+            win.loadFile(path.join(__dirname, 'dist/index.html'))
           }
 
           app.whenReady().then(() => {
-            createWindow();
+            createWindow()
             app.on('activate', () => {
-              if (BrowserWindow.getAllWindows().length === 0) createWindow();
-            });
-          });
+              if (BrowserWindow.getAllWindows().length === 0) createWindow()
+            })
+          })
 
           app.on('window-all-closed', () => {
-            app.quit();
-          });
-          EOF
+            if (process.platform !== 'darwin') app.quit()
+          })
+          '@
+          Set-Content -Path "electron-main.js" -Value $electronMain -Encoding UTF8
 
-      - name: Create electron-builder config
-        shell: bash
-        run: |
-          cat > electron-builder.json << 'EOF'
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.main = 'electron-main.js';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+            console.log('package.json updated, main =', pkg.main);
+          "
+
+          $builderConfig = @'
           {
             "appId": "com.ggpasoryan.pos",
             "productName": "GG Pasoryan POS",
-            "copyright": "Copyright © 2025 GG Pasoryan",
-            "main": "electron-main.js",
             "directories": {
-              "output": "dist-exe"
+              "output": "release"
             },
             "files": [
               "dist/**/*",
-              "electron-main.js"
+              "electron-main.js",
+              "node_modules/**/*",
+              "package.json"
             ],
             "win": {
               "target": [
@@ -103,34 +95,21 @@ jobs:
                   "arch": ["x64"]
                 }
               ],
-              "icon": "dist/icon-512.png"
+              "icon": "public/icon-512.png"
             },
             "portable": {
               "artifactName": "GG-Pasoryan-POS-Windows.exe"
             }
           }
-          EOF
-
-      - name: Copy icon to dist
-        shell: bash
-        run: |
-          cp public/icon-512.png dist/icon-512.png || echo "icon not found, skipping"
-
-      - name: Add electron to package.json main field
-        shell: bash
-        run: |
-          node -e "
-            const pkg = JSON.parse(require('fs').readFileSync('package.json'));
-            pkg.main = 'electron-main.js';
-            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-          "
+          '@
+          Set-Content -Path "electron-builder.json" -Value $builderConfig -Encoding UTF8
 
       - name: Build EXE (Portable)
-        run: npx electron-builder --config electron-builder.json --win portable
+        run: npx electron-builder --win --config electron-builder.json
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GG-Pasoryan-POS-Windows-EXE
-          path: dist-exe/GG-Pasoryan-POS-Windows.exe
+          name: GG-Pasoryan-POS-Windows
+          path: release/GG-Pasoryan-POS-Windows.exe
           retention-days: 30
