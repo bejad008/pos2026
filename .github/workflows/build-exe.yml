@@ -1,0 +1,115 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write  # wajib untuk upload ke GitHub Releases
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Inject main into package.json
+        shell: pwsh
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+            pkg.main = 'electron-main.js';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+            console.log('Injected main ok');
+          "
+
+      - name: Create electron-main.js
+        shell: pwsh
+        run: |
+          @'
+          const { app, BrowserWindow } = require('electron')
+          const path = require('path')
+
+          function createWindow() {
+            const win = new BrowserWindow({
+              width: 1280,
+              height: 800,
+              minWidth: 800,
+              minHeight: 600,
+              icon: path.join(__dirname, 'public', 'icon.ico'),
+              webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true
+              },
+              autoHideMenuBar: true,
+              title: 'GG Pasoryan Enterprise POS'
+            })
+            win.loadURL('https://pos2026-mu.vercel.app')
+            win.setMenuBarVisibility(false)
+          }
+
+          app.whenReady().then(() => {
+            createWindow()
+            app.on('activate', () => {
+              if (BrowserWindow.getAllWindows().length === 0) createWindow()
+            })
+          })
+
+          app.on('window-all-closed', () => {
+            if (process.platform !== 'darwin') app.quit()
+          })
+          '@ | Set-Content electron-main.js -Encoding UTF8
+          Write-Host "electron-main.js created OK"
+
+      - name: Install Electron dependencies
+        run: npm install --save-dev electron electron-builder
+
+      - name: Build portable EXE
+        run: npx electron-builder --win portable --config electron-builder.json
+
+      - name: Verify EXE output
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path "release" -Filter "*.exe" -Recurse | Select-Object -First 1
+          if ($exe) {
+            Write-Host "EXE found: $($exe.FullName)"
+            Write-Host "Size: $([math]::Round($exe.Length / 1MB, 1)) MB"
+          } else {
+            Write-Error "EXE not found in release/"
+            exit 1
+          }
+
+      # GitHub Releases: gratis, limit 2GB per file
+      # Link download EXE dari sini, bukan dari repo langsung
+      - name: Upload ke GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
+          name: ${{ github.ref_type == 'tag' && format('GG POS {0}', github.ref_name) || format('GG POS Build #{0}', github.run_number) }}
+          body: |
+            ## GG Pasoryan Enterprise POS — Windows Portable
+
+            **Cara pakai:** Download → double-click → langsung jalan, tidak perlu install.
+
+            Login password: **008**
+
+            Demo web: https://pos2026-mu.vercel.app
+          draft: false
+          prerelease: ${{ github.ref_type != 'tag' }}
+          files: release/GG-Pasoryan-POS-Windows.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
