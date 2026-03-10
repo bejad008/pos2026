@@ -71,7 +71,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build TWA APK
-        run: printf 'ggpasoryan2026\nggpasoryan2026\n' | bubblewrap build --skipPwaValidation
+        run: |
+          yes no | bubblewrap build \
+            --skipPwaValidation \
+            --signingKeyPassphrase ggpasoryan2026 \
+            --signingKeyKeypassphrase ggpasoryan2026
 
       - name: Find & rename APK
         run: |
