@@ -1,0 +1,115 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Post Checkout repo
+        run: echo "Repo checked out"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Post Setup Node.js
+        run: echo "Node.js setup complete"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Vite
+        run: npm run build
+
+      - name: Install Electron & builder
+        run: npm install --save-dev electron electron-builder
+
+      - name: Generate Electron files
+        shell: pwsh
+        run: |
+          $electronMain = @'
+          const { app, BrowserWindow } = require('electron')
+          const path = require('path')
+
+          function createWindow() {
+            const win = new BrowserWindow({
+              width: 1280,
+              height: 800,
+              webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                partition: 'persist:ggpos'
+              }
+            })
+            win.loadFile(path.join(__dirname, 'dist/index.html'))
+          }
+
+          app.whenReady().then(() => {
+            createWindow()
+            app.on('activate', () => {
+              if (BrowserWindow.getAllWindows().length === 0) createWindow()
+            })
+          })
+
+          app.on('window-all-closed', () => {
+            if (process.platform !== 'darwin') app.quit()
+          })
+          '@
+          Set-Content -Path "electron-main.js" -Value $electronMain -Encoding UTF8
+
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.main = 'electron-main.js';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+            console.log('package.json updated, main =', pkg.main);
+          "
+
+          $builderConfig = @'
+          {
+            "appId": "com.ggpasoryan.pos",
+            "productName": "GG Pasoryan POS",
+            "directories": {
+              "output": "release"
+            },
+            "files": [
+              "dist/**/*",
+              "electron-main.js",
+              "node_modules/**/*",
+              "package.json"
+            ],
+            "win": {
+              "target": [
+                {
+                  "target": "portable",
+                  "arch": ["x64"]
+                }
+              ],
+              "icon": "public/icon-512.png"
+            },
+            "portable": {
+              "artifactName": "GG-Pasoryan-POS-Windows.exe"
+            }
+          }
+          '@
+          Set-Content -Path "electron-builder.json" -Value $builderConfig -Encoding UTF8
+
+      - name: Build EXE (Portable)
+        run: npx electron-builder --win --config electron-builder.json
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GG-Pasoryan-POS-Windows
+          path: release/GG-Pasoryan-POS-Windows.exe
+          retention-days: 30

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>GG Pasoryan Enterprise POS</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Theme Color — wajib untuk TWA/APK agar tidak ada browser bar -->
+    <meta name="theme-color" content="#1a1412" />
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="GG POS" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- Android / Chrome PWA -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Windows Tile -->
+    <meta name="msapplication-TileColor" content="#1a1412" />
+    <meta name="msapplication-TileImage" content="/icon-192.png" />
+
+    <!-- Misc -->
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="description" content="Sistem Kasir Enterprise GG Pasoryan" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker
+            .register('/sw.js', { scope: '/' })
+            .then(function (reg) {
+              console.log('[SW] Registered:', reg.scope);
+              // Cek update otomatis setiap 60 menit
+              setInterval(function () { reg.update(); }, 60 * 60 * 1000);
+            })
+            .catch(function (err) {
+              console.warn('[SW] Registration failed:', err);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>
